@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import { W, H, BRAND } from '../config.js';
+import { W, H, M, BRAND } from '../config.js';
 import { save } from '../save.js';
 import { sfx, applyMute } from '../audio.js';
-import { button, cover, go, fadeIn, txt, txtR } from '../ui.js';
+import { button, roundButton, cover, go, fadeIn, txt, txtR } from '../ui.js';
 
 export default class Menu extends Phaser.Scene {
   constructor() { super('Menu'); }
@@ -24,57 +24,64 @@ export default class Menu extends Phaser.Scene {
       });
     }
 
-    // Drifting clouds
-    [[470, 0.55], [620, 0.7], [790, 0.5]].forEach(([y, sc]) => this.drift(y, sc));
+    // Layout is anchored from the bottom up (all gaps 24), so tall screens just give the hero more room.
+    const spare = H - 1280;
+    const parentsY = H - 85;                  // small text button, 40 from the bottom
+    const dailyY = parentsY - 46 - 24 - 62;   // 340 wide, 124 tall
+    const startY = dailyY - 62 - 24 - 77;     // 420 wide, 154 tall
+    const feetY = startY - 77 - 24 - 95;      // hero feet, with the cloud under them
+    const heroH = Math.min(640, 450 + spare * 0.6);
+    const logoY = 195 + spare * 0.2;
+
+    // Drifting clouds (kept clear of the buttons)
+    [[feetY - 360, 0.55], [feetY - 200, 0.7], [feetY - 40, 0.5]].forEach(([y, sc]) => this.drift(y, sc));
 
     // Hero standing on a cloud
-    const cloud = this.add.image(W / 2, 845, 'cloud').setScale(0.9);
-    const hero = this.add.image(W / 2, 835, 'hero').setOrigin(0.5, 1);
-    hero.setScale(500 / hero.height);
-    this.tweens.add({ targets: hero, y: 824, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.tweens.add({ targets: cloud, y: 850, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    const cloud = this.add.image(W / 2, feetY + 10, 'cloud').setScale(0.9);
+    const hero = this.add.image(W / 2, feetY, 'hero').setOrigin(0.5, 1);
+    hero.setScale(heroH / hero.height);
+    this.tweens.add({ targets: hero, y: feetY - 11, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: cloud, y: feetY + 16, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     // Logo drops in with a bounce
     const logo = this.add.image(W / 2, -220, 'logo');
-    logo.setScale(600 / logo.width);
+    logo.setScale(500 / logo.width);
     this.tweens.add({
-      targets: logo, y: 215, duration: 900, ease: 'Bounce.Out', delay: 150,
+      targets: logo, y: logoY, duration: 900, ease: 'Bounce.Out', delay: 150,
       onComplete: () => this.tweens.add({ targets: logo, scale: logo.scale * 1.03, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.InOut' }),
     });
 
-    const start = button(this, W / 2, 965, 'СТАРТ', {
-      w: 380, size: 60, sound: 'start', pulse: true,
+    // Sound and clock switches sit in the top corners as round icons.
+    const snd = roundButton(this, M + 38, 70, 76, 'sound', () => {
+      save.sound = !save.sound;
+      applyMute(this);
+      snd.setOff(!save.sound);
+      if (save.sound) sfx(this, 'click');
+    }, null);
+    snd.setOff(!save.sound);
+    // Calm mode hides the running clock for kids who feel rushed by it.
+    const tmr = roundButton(this, W - M - 38, 70, 76, 'timer', () => {
+      save.hideTimer = !save.hideTimer;
+      tmr.setOff(save.hideTimer);
+    });
+    tmr.setOff(save.hideTimer);
+
+    const start = button(this, W / 2, startY, 'СТАРТ', {
+      w: 420, size: 64, sound: 'start', pulse: true,
       onClick: () => go(this, 'Levels', { focus: save.currentLevel() }),
     });
-    this.reveal(start, 700, 965);
+    this.reveal(start, 700, startY);
 
     const streak = save.streak();
-    const daily = button(this, W / 2, 1110, 'Таблица дня', {
-      w: 380, size: 38, icon: 'flame', sound: 'start',
+    const daily = button(this, W / 2, dailyY, 'Таблица дня', {
+      w: 340, size: 32, icon: 'flame', sound: 'start',
       onClick: () => go(this, 'Game', { daily: true }),
     });
-    this.reveal(daily, 850, 1110);
-    this.dailyBadge(streak);
+    this.reveal(daily, 850, dailyY);
+    this.dailyBadge(streak, dailyY);
 
-    const row = 1232;
-    const snd = button(this, 125, row, save.sound ? 'Звук: вкл' : 'Звук: выкл', {
-      w: 215, size: 25, sound: null,
-      onClick: () => {
-        save.sound = !save.sound;
-        applyMute(this);
-        snd.label.setText(save.sound ? 'Звук: вкл' : 'Звук: выкл');
-        if (save.sound) sfx(this, 'click');
-      },
-    });
-    // Calm mode hides the running clock for kids who feel rushed by it.
-    const tmr = button(this, W / 2, row, save.hideTimer ? 'Таймер: выкл' : 'Таймер: вкл', {
-      w: 215, size: 25,
-      onClick: () => {
-        save.hideTimer = !save.hideTimer;
-        tmr.label.setText(save.hideTimer ? 'Таймер: выкл' : 'Таймер: вкл');
-      },
-    });
-    button(this, W - 125, row, 'Родителям', { w: 215, size: 25, onClick: () => this.openGate() });
+    const parents = button(this, W / 2, parentsY, 'Родителям', { w: 250, size: 26, onClick: () => this.openGate() });
+    this.reveal(parents, 1000, parentsY);
   }
 
   reveal(obj, delay, y) {
@@ -83,9 +90,9 @@ export default class Menu extends Phaser.Scene {
   }
 
   // Streak badge on the daily button: number while a streak runs, a check once today is done.
-  dailyBadge(streak) {
-    const x = W / 2 + 175;
-    const y = 1110 - 56;
+  dailyBadge(streak, dailyY) {
+    const x = W / 2 + 150;
+    const y = dailyY - 56;
     const done = streak.doneToday;
     if (!done && streak.current === 0) return;
     const g = this.add.graphics({ x, y }).setDepth(5);
@@ -119,9 +126,10 @@ export default class Menu extends Phaser.Scene {
     const b = Phaser.Math.Between(6, 9);
     const right = a * b;
     const options = Phaser.Utils.Array.Shuffle([right, right + Phaser.Math.Between(2, 5), right - Phaser.Math.Between(2, 5)]);
+    const cy = H * 0.44;
 
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x0b1040, 0.75).setDepth(300).setInteractive();
-    const card = this.add.container(W / 2, 560).setDepth(301).setScale(0.6).setAlpha(0);
+    const card = this.add.container(W / 2, cy).setDepth(301).setScale(0.6).setAlpha(0);
     const bg = this.add.graphics();
     bg.fillStyle(0xffffff, 1).fillRoundedRect(-300, -250, 600, 500, 40);
     bg.lineStyle(6, BRAND.cyan, 1).strokeRoundedRect(-300, -250, 600, 500, 40);
@@ -134,7 +142,7 @@ export default class Menu extends Phaser.Scene {
     this.tweens.add({ targets: card, scale: 1, alpha: 1, duration: 300, ease: 'Back.Out' });
 
     const btns = options.map((v, i) => {
-      const bt = button(this, W / 2 - 190 + i * 190, 640, String(v), {
+      const bt = button(this, W / 2 - 190 + i * 190, cy + 80, String(v), {
         w: 170, size: 40, sound: null,
         onClick: () => {
           if (v === right) {
@@ -150,7 +158,7 @@ export default class Menu extends Phaser.Scene {
       bt.setDepth(302);
       return bt;
     });
-    const cancel = button(this, W / 2, 770, 'Назад', { w: 230, size: 32, sound: 'back', onClick: () => this.closeGate() });
+    const cancel = button(this, W / 2, cy + 200, 'Назад', { w: 230, size: 32, sound: 'back', onClick: () => this.closeGate() });
     cancel.setDepth(302);
     this.gate = { dim, card, btns, cancel };
   }

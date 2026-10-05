@@ -1,5 +1,10 @@
 export const W = 720;
-export const H = 1280;
+// Height adapts to the screen: 1280 on desktop and shorter phones, up to 1600 on tall phones, so no
+// plain bars show above and below the game. Layouts anchor to the top and bottom and use H.
+const aspect = typeof window !== 'undefined' && window.innerWidth > 0 ? window.innerHeight / window.innerWidth : 16 / 9;
+export const H = Math.round(Math.min(1600, Math.max(1280, W * aspect)));
+// Layout grid: 40-unit side margins, gaps of 16, 24 or 40.
+export const M = 40;
 // Neuronus is the show's brand font; it has no "×", so Nunito covers that glyph.
 export const FONT = 'Neuronus, Nunito, system-ui, sans-serif';
 

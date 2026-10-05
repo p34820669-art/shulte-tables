@@ -94,6 +94,42 @@ export function iconButton(scene, x, y, key, size, onClick, sound = 'click') {
   return c;
 }
 
+// Round glossy icon button drawn in code. kind: 'sound' | 'timer'. setOff(true) shows a slash.
+export function roundButton(scene, x, y, size, kind, onClick, sound = 'click') {
+  const r = size / 2;
+  const g = scene.add.graphics();
+  g.fillStyle(0x2a47c8, 1).fillCircle(0, 5, r);
+  g.fillStyle(0x4aa8ff, 1).fillCircle(0, 0, r);
+  g.fillStyle(0x8a63f0, 0.75).fillEllipse(0, r * 0.42, r * 1.7, r * 1.0);
+  g.fillStyle(0xffffff, 0.38).fillEllipse(-r * 0.15, -r * 0.5, r * 1.15, r * 0.5);
+  g.lineStyle(4, 0xffffff, 0.7).strokeCircle(0, 0, r - 2);
+  const parts = [g];
+  let icon;
+  if (kind === 'timer') {
+    icon = scene.add.image(0, 0, 'stopwatch');
+    icon.setScale((size * 0.58) / icon.height);
+  } else {
+    icon = scene.add.graphics();
+    icon.fillStyle(0xffffff, 1).fillPoints([
+      { x: -16, y: -8 }, { x: -6, y: -8 }, { x: 5, y: -18 }, { x: 5, y: 18 }, { x: -6, y: 8 }, { x: -16, y: 8 },
+    ], true);
+    icon.lineStyle(5, 0xffffff, 1);
+    icon.beginPath().arc(6, 0, 13, -0.95, 0.95).strokePath();
+    icon.beginPath().arc(6, 0, 24, -0.85, 0.85).strokePath();
+  }
+  parts.push(icon);
+  const slash = scene.add.graphics().setVisible(false);
+  slash.lineStyle(11, 0x11132c, 0.9).lineBetween(-r * 0.5, -r * 0.5, r * 0.5, r * 0.5);
+  slash.lineStyle(6, 0xff5d6c, 1).lineBetween(-r * 0.5, -r * 0.5, r * 0.5, r * 0.5);
+  parts.push(slash);
+  const zone = scene.add.zone(0, 0, size + 24, size + 24).setInteractive({ useHandCursor: true });
+  parts.push(zone);
+  const c = scene.add.container(x, y, parts);
+  pressFx(scene, c, zone, onClick, sound);
+  c.setOff = (off) => { slash.setVisible(off); icon.setAlpha(off ? 0.55 : 1); };
+  return c;
+}
+
 // One-shot particle burst; cleans itself up.
 export function burst(scene, x, y, { n = 10, key = 'spark', scale = 0.5, speed = [120, 320], tint, life = 600, depth = 30 } = {}) {
   const p = scene.add.particles(x, y, key, {

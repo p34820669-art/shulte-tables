@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
-import { W, H, C, WORLDS, worldLevels } from '../config.js';
+import { W, H, M, C, WORLDS, worldLevels } from '../config.js';
 import { save } from '../save.js';
 import { sfx, applyMute } from '../audio.js';
 import { txt, pill, iconButton, burst, cover, go, fadeIn } from '../ui.js';
 
-const TILE = 150;
-const GAP = 44;
+const TILE = 170;
+const GAP = 36;
 const COLS = 3;
 const TOP = 215;
-const ROW = TILE + 62; // row pitch leaves room for the stars under each tile
+const ROW = TILE + 64; // row pitch leaves room for the stars under each tile
 
 export default class Levels extends Phaser.Scene {
   constructor() { super('Levels'); }
@@ -68,14 +68,14 @@ export default class Levels extends Phaser.Scene {
     }
     g.fillStyle(0x2f4fb5, 0.9).fillRect(0, 0, W, 130);
 
-    const back = iconButton(this, 66, 68, 'back', 92, () => go(this, 'Menu'), 'back');
+    const back = iconButton(this, M + 42, 70, 'back', 84, () => go(this, 'Menu'), 'back');
     back.setScrollFactor(0).setDepth(100);
-    const title = pill(this, W / 2, 68, 330, 92).setScrollFactor(0).setDepth(100);
-    const tt = txt(this, W / 2, 66, 'Выбери уровень', 33).setScrollFactor(0).setDepth(101);
+    const title = pill(this, W / 2, 70, 330, 84).setScrollFactor(0).setDepth(100);
+    const tt = txt(this, W / 2, 68, 'Выбери уровень', 33).setScrollFactor(0).setDepth(101);
 
-    const sp = pill(this, 616, 68, 150, 78).setScrollFactor(0).setDepth(100);
-    const star = this.add.image(574, 66, 'star').setScale(46 / 280).setScrollFactor(0).setDepth(101);
-    const st = txt(this, 626, 66, String(save.totalStars()), 34).setScrollFactor(0).setDepth(101);
+    const sp = pill(this, W - M - 75, 70, 150, 72).setScrollFactor(0).setDepth(100);
+    const star = this.add.image(W - M - 75 - 42, 68, 'star').setScale(46 / 280).setScrollFactor(0).setDepth(101);
+    const st = txt(this, W - M - 75 + 14, 68, String(save.totalStars()), 34).setScrollFactor(0).setDepth(101);
     this.headerParts = [title, tt, sp, star, st];
   }
 

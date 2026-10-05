@@ -48,7 +48,7 @@ export default class Parents extends Phaser.Scene {
   header() {
     const bar = this.add.rectangle(W / 2, 0, W, HEAD - 20, 0xffffff).setOrigin(0.5, 0).setScrollFactor(0).setDepth(90);
     const line = this.add.rectangle(W / 2, HEAD - 20, W, 3, 0xe3e6ee).setOrigin(0.5, 0).setScrollFactor(0).setDepth(90);
-    const back = iconButton(this, 66, 60, 'back', 84, () => go(this, 'Menu'), 'back');
+    const back = iconButton(this, 82, 60, 'back', 84, () => go(this, 'Menu'), 'back');
     back.setScrollFactor(0).setDepth(100);
     txtR(this, W / 2 + 30, 48, 'Для родителей', 44, { color: BRAND.cyanText }).setScrollFactor(0).setDepth(100);
     txtR(this, W / 2 + 30, 92, 'Как ребёнок тренирует внимание', 24, { color: BRAND.muted, weight: 400 }).setScrollFactor(0).setDepth(100);

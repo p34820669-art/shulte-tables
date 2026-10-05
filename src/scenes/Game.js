@@ -1,12 +1,11 @@
 import Phaser from 'phaser';
-import { W, H, C, TOTAL_LEVELS, levelInfo, buildPuzzle, calcStars, fmtTime } from '../config.js';
+import { W, H, M, C, TOTAL_LEVELS, levelInfo, buildPuzzle, calcStars, fmtTime } from '../config.js';
 import { save } from '../save.js';
 import { dailyInfo } from '../daily.js';
 import { dateKey, plural } from '../dates.js';
 import { sfx, applyMute, buzz } from '../audio.js';
 import { txt, button, iconButton, pill, burst, cover, go, fadeIn, speech } from '../ui.js';
 
-const GRID = { cx: W / 2, cy: 735, size: 640 };
 const IDLE_HINT_MS = 9000;
 
 // What the hero says after a run, by star count.
@@ -46,6 +45,7 @@ export default class Game extends Phaser.Scene {
     fadeIn(this);
     cover(this, 'bg_game').setTint(this.info.world.tint);
 
+    this.layout();
     this.buildHud();
     this.buildBottom();
     this.setTarget(this.targets[0], false);
@@ -61,73 +61,98 @@ export default class Game extends Phaser.Scene {
 
   // ---------- Layout ----------
 
-  buildHud() {
-    iconButton(this, 66, 66, 'back', 92, () => (this.isDaily ? go(this, 'Menu') : go(this, 'Levels', { focus: this.level })), 'back');
-    pill(this, W / 2, 66, 340, 92);
-    txt(this, W / 2, 64, this.isDaily ? 'Таблица дня' : `Уровень ${this.level}`, 38);
-    iconButton(this, W - 66, 66, 'restart', 92, () => go(this, 'Game', { level: this.level, daily: this.isDaily }), 'restart');
+  // Layout on a 40-unit margin grid: header and banner stack from the top, the hint button is
+  // anchored to the bottom, and the grid frame is centred in the space between them.
+  layout() {
+    const hintH = 124;
+    const hintY = H - 64 - hintH / 2;
+    const top = 262 + 24;                      // below the banner
+    const bottom = hintY - hintH / 2 - 24;     // above the hint button
+    const frameH = 660;
+    const chipHalf = 34;                       // status chips are docked on the frame's top edge
+    const frameTop = top + chipHalf + (bottom - top - chipHalf - frameH) / 2;
+    this.L = { hintY, frameTop, frameH };
+  }
 
-    // Task banner: the target sits right under the level name.
+  buildHud() {
+    iconButton(this, M + 42, 72, 'back', 84, () => (this.isDaily ? go(this, 'Menu') : go(this, 'Levels', { focus: this.level })), 'back');
+    pill(this, W / 2, 72, 340, 84);
+    txt(this, W / 2, 70, this.isDaily ? 'Таблица дня' : `Уровень ${this.level}`, 36);
+    iconButton(this, W - M - 42, 72, 'restart', 84, () => go(this, 'Game', { level: this.level, daily: this.isDaily }), 'restart');
+
+    // Task banner: label, target and arrow form one centred group right under the header.
     this.banner = this.add.container(W / 2, 200);
-    const bp = pill(this, 0, 0, 560, 140);
-    const lab = txt(this, -165, 4, this.puzzle.label, 44);
-    const hasArrow = !!this.puzzle.arrow;
-    this.numText = txt(this, hasArrow ? 50 : 90, 0, '1', 96, { color: C.gold, stroke: '#2d3a9e', sw: 12 });
+    const bp = pill(this, 0, 0, W - 2 * M, 124);
+    const lab = txt(this, 0, 4, this.puzzle.label, 40).setOrigin(0, 0.5);
+    this.numText = txt(this, 0, 0, '1', 100, { color: C.gold, stroke: '#2d3a9e', sw: 12 });
     this.banner.add([bp, lab, this.numText]);
+    const hasArrow = !!this.puzzle.arrow;
+    const slot = 150; // fixed-width slot so the group does not shift when the target changes
+    const arrowW = 56;
+    const total = lab.width + 24 + slot + (hasArrow ? 24 + arrowW : 0);
+    const x0 = -total / 2;
+    lab.x = x0;
+    this.numText.x = x0 + lab.width + 24 + slot / 2;
     if (hasArrow) {
       const arrow = this.add.graphics();
       const up = this.puzzle.arrow === 'up';
       const pts = up ? [0, -28, 28, 16, -28, 16] : [0, 28, 28, -16, -28, -16];
       arrow.fillStyle(0xffffff, 1).lineStyle(6, 0x2d3a9e, 1);
       arrow.fillTriangle(...pts).strokeTriangle(...pts);
-      arrow.setPosition(205, 4);
+      arrow.setPosition(x0 + lab.width + 24 + slot + 24 + arrowW / 2, 4);
       this.banner.add(arrow);
     }
 
-    // Status pills. Calm mode swaps the clock for a progress counter and hides the record.
+    // Status chips dock on the grid frame's top edge. Calm mode swaps the clock for a progress
+    // counter and hides the record.
     const best = this.isDaily ? null : save.bestTime(this.level);
     const showBest = best !== null && !this.calm;
-    const lx = showBest ? 205 : W / 2;
-    const lw = showBest ? 270 : 310;
-    pill(this, lx, 325, lw, 76);
+    const cy = this.L.frameTop;
+    const cw = showBest ? 250 : 280;
+    const cx = showBest ? M + 24 + cw / 2 : W / 2;
+    pill(this, cx, cy, cw, 68).setDepth(4);
     if (this.calm) {
-      const s = this.add.image(lx - lw / 2 + 40, 323, 'star');
-      s.setScale(46 / s.width);
-      this.statText = txt(this, lx + 22, 322, `0/${this.targets.length}`, 40);
+      const s = this.add.image(cx - cw / 2 + 38, cy - 1, 'star').setDepth(5);
+      s.setScale(42 / s.width);
+      this.statText = txt(this, cx + 18, cy - 2, `0/${this.targets.length}`, 36).setDepth(5);
     } else {
-      const sw = this.add.image(lx - lw / 2 + 36, 323, 'stopwatch');
-      sw.setScale(52 / sw.height);
-      this.statText = txt(this, lx + 26, 322, '0,0', 40);
+      const sw = this.add.image(cx - cw / 2 + 36, cy - 1, 'stopwatch').setDepth(5);
+      sw.setScale(46 / sw.height);
+      this.statText = txt(this, cx + 22, cy - 2, '0,0', 36).setDepth(5);
     }
     if (showBest) {
-      pill(this, 515, 325, 270, 76);
-      const s = this.add.image(515 - 135 + 40, 323, 'star');
-      s.setScale(46 / s.width);
-      txt(this, 515 + 26, 322, `Рекорд ${fmtTime(best).replace(/\d$/, '')}`, 32);
+      const rx = W - M - 24 - cw / 2;
+      pill(this, rx, cy, cw, 68).setDepth(4);
+      const s = this.add.image(rx - cw / 2 + 38, cy - 1, 'star').setDepth(5);
+      s.setScale(42 / s.width);
+      txt(this, rx + 22, cy - 2, `Рекорд ${fmtTime(best).replace(/\d$/, '')}`, 28).setDepth(5);
     }
   }
 
   buildField() {
     const { size } = this.info;
-    const S = GRID.size;
-    const L = GRID.cx - S / 2;
-    const T = GRID.cy - S / 2;
+    const FW = W - 2 * M;
+    const { frameTop: T, frameH: FH } = this.L;
 
+    // Darker translucent frame so clouds behind the grid do not compete with the numbers.
     const g = this.add.graphics().setDepth(1);
     [[34, 0.07], [22, 0.12], [12, 0.22], [6, 0.9]].forEach(([lw, a]) => {
-      g.lineStyle(lw, C.glow, a).strokeRoundedRect(L, T, S, S, 56);
+      g.lineStyle(lw, C.glow, a).strokeRoundedRect(M, T, FW, FH, 56);
     });
-    g.fillStyle(0xffffff, 0.2).fillRoundedRect(L, T, S, S, 56);
+    g.fillStyle(0x16286f, 0.32).fillRoundedRect(M, T, FW, FH, 56);
 
-    const pad = 34;
+    const padX = 28;
+    const inner = FW - 2 * padX;
     const gap = size === 3 ? 20 : size === 4 ? 16 : 12;
-    const cell = (S - pad * 2 - gap * (size - 1)) / size;
+    const cell = (inner - gap * (size - 1)) / size;
+    const gridLeft = M + padX;
+    const gridTop = T + 46; // clears the docked chips
     const order = Phaser.Utils.Array.Shuffle(this.puzzle.cells.slice());
     const last = order.length - 1;
 
     order.forEach((pc, i) => {
-      const x = L + pad + cell / 2 + (i % size) * (cell + gap);
-      const y = T + pad + cell / 2 + Math.floor(i / size) * (cell + gap);
+      const x = gridLeft + cell / 2 + (i % size) * (cell + gap);
+      const y = gridTop + cell / 2 + Math.floor(i / size) * (cell + gap);
       const bg = this.add.image(0, 0, 'tile').setDisplaySize(cell, cell);
       const label = txt(this, 0, -cell * 0.03, pc.label, Math.round(cell * 0.52), { color: this.twoColor ? C.pair[pc.color] : C.ink, sw: 0, shadow: false });
       const c = this.add.container(x, y, [bg, label]).setDepth(2);
@@ -147,8 +172,8 @@ export default class Game extends Phaser.Scene {
   }
 
   buildBottom() {
-    button(this, W / 2, 1165, 'ПОДСКАЗКА', {
-      w: 440, size: 44, icon: 'bulb', sound: 'hint',
+    button(this, W / 2, this.L.hintY, 'ПОДСКАЗКА', {
+      w: 340, size: 32, icon: 'bulb', sound: 'hint',
       onClick: () => { if (this.running) this.showHint(2600, false); },
     });
   }
@@ -163,15 +188,15 @@ export default class Game extends Phaser.Scene {
     const name = txt(this, W / 2, 310, world.title, 62).setDepth(301).setAlpha(0);
     this.tweens.add({ targets: [title, name], alpha: 1, duration: 400, delay: 200 });
 
-    const hero = this.add.image(170, 1560, 'hero').setOrigin(0.5, 1).setDepth(301);
+    const hero = this.add.image(170, H + 280, 'hero').setOrigin(0.5, 1).setDepth(301);
     hero.setScale(780 / hero.height);
-    this.tweens.add({ targets: hero, y: 1330, duration: 520, ease: 'Back.Out', delay: 150 });
+    this.tweens.add({ targets: hero, y: H + 50, duration: 520, ease: 'Back.Out', delay: 150 });
     this.tweens.add({ targets: hero, angle: { from: -1.5, to: 1.5 }, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 700 });
 
-    const bubble = speech(this, 470, 640, world.intro, { w: 400, size: 34 }).setDepth(302).setScale(0);
+    const bubble = speech(this, 470, H * 0.5, world.intro, { w: 400, size: 34 }).setDepth(302).setScale(0);
     this.tweens.add({ targets: bubble, scale: 1, duration: 380, ease: 'Back.Out', delay: 550, onStart: () => sfx(this, 'pointer') });
 
-    const go1 = button(this, 470, 1010, 'Поехали!', {
+    const go1 = button(this, 470, H - 270, 'Поехали!', {
       w: 380, size: 50, sound: 'start', pulse: true,
       onClick: () => {
         go1.disabled = true;
@@ -320,7 +345,7 @@ export default class Game extends Phaser.Scene {
     this.tweens.add({ targets: dim, fillAlpha: 0.62, duration: 280 });
     sfx(this, 'panel');
 
-    const PY = 520;
+    const PY = Math.round(H * 0.37);
     const pc = this.add.container(W / 2, PY).setDepth(201).setScale(0.4).setAlpha(0);
     const panel = this.add.image(0, 0, 'panel');
     panel.setDisplaySize(680, 500);
@@ -380,21 +405,23 @@ export default class Game extends Phaser.Scene {
     if (stars === 3) this.time.delayedCall(endAt - 150, () => { sfx(this, 'three_star'); this.confetti(); });
     if (isRecord && prevBest !== null) this.time.delayedCall(endAt, () => sfx(this, 'record'));
 
-    // Buttons
-    const by = PY + ph / 2 + 110;
-    const mk = (x, label, w, fn, o = {}) => {
-      const b = button(this, x, by, label, { w, size: 34, onClick: fn, ...o });
+    // One big primary button, with the secondary action smaller underneath (all gaps 24).
+    const primaryY = PY + ph / 2 + 24 + 80;
+    const secondY = primaryY + 80 + 24 + 37;
+    this.heroTop = secondY + 37 + 16;
+    const mk = (x, y, label, w, fn, o = {}) => {
+      const b = button(this, x, y, label, { w, size: 34, onClick: fn, ...o });
       b.setDepth(202).setAlpha(0);
-      this.tweens.add({ targets: b, alpha: 1, y: { from: by + 40, to: by }, duration: 360, delay: 500, ease: 'Back.Out' });
+      this.tweens.add({ targets: b, alpha: 1, y: { from: y + 40, to: y }, duration: 360, delay: 500, ease: 'Back.Out' });
       return b;
     };
     if (this.isDaily) {
-      mk(215, 'ЕЩЁ РАЗ', 270, () => go(this, 'Game', { level: 0, daily: true }), { sound: 'restart' });
-      mk(505, 'В МЕНЮ', 270, () => go(this, 'Menu'), { sound: 'next', pulse: true, size: 36 });
+      mk(W / 2, primaryY, 'В МЕНЮ', 440, () => go(this, 'Menu'), { sound: 'next', pulse: true, size: 44 });
+      mk(W / 2, secondY, 'ЕЩЁ РАЗ', 200, () => go(this, 'Game', { level: 0, daily: true }), { sound: 'restart', size: 30 });
     } else {
-      mk(125, 'ЗАНОВО', 220, () => go(this, 'Game', { level: this.level }), { sound: 'restart' });
-      mk(360, 'УРОВНИ', 220, () => go(this, 'Levels', { focus: this.level, pop: hasNext && firstClear ? this.level + 1 : null }), { sound: 'back' });
-      mk(595, 'ДАЛЬШЕ', 230, () => (hasNext ? go(this, 'Game', { level: this.level + 1 }) : go(this, 'Levels', { focus: this.level })), { sound: 'next', pulse: true, size: 36 });
+      mk(W / 2, primaryY, 'ДАЛЬШЕ', 440, () => (hasNext ? go(this, 'Game', { level: this.level + 1 }) : go(this, 'Levels', { focus: this.level })), { sound: 'next', pulse: true, size: 44 });
+      mk(W / 2 - 110, secondY, 'ЗАНОВО', 200, () => go(this, 'Game', { level: this.level }), { sound: 'restart', size: 30 });
+      mk(W / 2 + 110, secondY, 'УРОВНИ', 200, () => go(this, 'Levels', { focus: this.level, pop: hasNext && firstClear ? this.level + 1 : null }), { sound: 'back', size: 30 });
     }
 
     this.heroReacts({ stars, errors, isRecord: isRecord && prevBest !== null, streakUp: this.isDaily && streak.first });
@@ -408,9 +435,10 @@ export default class Game extends Phaser.Scene {
     else if (errors === 0 && stars === 3) line = 'Ни одной ошибки! Ты мастер!';
     else if (isRecord) line = 'Новый рекорд! Ура!';
 
-    const hero = this.add.image(125, 1700, 'hero').setOrigin(0.5, 1).setDepth(203);
-    hero.setScale(560 / hero.height);
-    const baseY = 1500;
+    const heroH = 520;
+    const baseY = this.heroTop + heroH;
+    const hero = this.add.image(125, baseY + 220, 'hero').setOrigin(0.5, 1).setDepth(203);
+    hero.setScale(heroH / hero.height);
     this.tweens.add({ targets: hero, y: baseY, duration: 480, ease: 'Back.Out', delay: 900 });
     this.time.delayedCall(1500, () => {
       if (stars === 3) {
@@ -422,7 +450,7 @@ export default class Game extends Phaser.Scene {
       }
     });
 
-    const bubble = speech(this, 440, 1085, line, { w: 440, size: 32, side: 'left' }).setDepth(204).setScale(0);
+    const bubble = speech(this, 450, this.heroTop + 100, line, { w: 440, size: 32, side: 'left' }).setDepth(204).setScale(0);
     this.tweens.add({ targets: bubble, scale: 1, duration: 360, ease: 'Back.Out', delay: 1350 });
   }
 
