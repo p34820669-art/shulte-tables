@@ -1,0 +1,21 @@
+{
+  "name": "shulte-tables",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "assets": "node tools/build-assets.mjs"
+  },
+  "dependencies": {
+    "@fontsource/nunito": "^5.2.7",
+    "@fontsource/rubik": "^5.3.0",
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5",
+    "vite": "^8.3.2"
+  }
+}
