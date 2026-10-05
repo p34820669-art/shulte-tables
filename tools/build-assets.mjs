@@ -1,7 +1,7 @@
 // Resizes and converts the Unity source art into small WebP files for the web build.
 import sharp from 'sharp';
 import fs from 'node:fs';
-import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const G = 'D:/claudeProjects/games.Shulte/Assets/Graphics/';
 const S = 'D:/claudeProjects/games.Shulte/Assets/SFX/new/';
@@ -33,7 +33,7 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const [name, src, w, h, trim] of images) {
   let img = sharp(G + src);
   if (trim) img = img.trim({ threshold: 8 });
-  const buf = await img.resize(w, h, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 88, alphaQuality: 95 }).toBuffer({ resolveWithObject: true });
+  const buf = await img.resize(w, h, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 84, alphaQuality: 90, effort: 6 }).toBuffer({ resolveWithObject: true });
   fs.writeFileSync(OUT + name + '.webp', buf.data);
   console.log(name.padEnd(12), buf.info.width + 'x' + buf.info.height, Math.round(buf.data.length / 1024) + 'KB');
 }
@@ -46,9 +46,12 @@ const sfx = {
   three_star: '3-star full celebration accent', whoosh: 'Scene transition whoosh',
 };
 fs.mkdirSync('public/sfx', { recursive: true });
+// Sounds are trimmed of leading and trailing silence (less latency, smaller files), mono, 56 kbps.
+const trim = 'silenceremove=start_periods=1:start_threshold=-55dB,areverse,silenceremove=start_periods=1:start_threshold=-55dB,areverse';
 let total = 0;
 for (const [k, v] of Object.entries(sfx)) {
-  fs.copyFileSync(S + v + '.mp3', `public/sfx/${k}.mp3`);
-  total += fs.statSync(`public/sfx/${k}.mp3`).size;
+  const out = `public/sfx/${k}.mp3`;
+  execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', S + v + '.mp3', '-vn', '-map_metadata', '-1', '-af', trim, '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '56k', out]);
+  total += fs.statSync(out).size;
 }
 console.log('sfx total', Math.round(total / 1024) + 'KB');

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { W, H, BRAND } from '../config.js';
 import { save } from '../save.js';
 import { sfx, applyMute } from '../audio.js';
-import { button, cover, go, fadeIn, txtR } from '../ui.js';
+import { button, cover, go, fadeIn, txt, txtR } from '../ui.js';
 
 export default class Menu extends Phaser.Scene {
   constructor() { super('Menu'); }
@@ -97,7 +97,7 @@ export default class Menu extends Phaser.Scene {
       c.lineStyle(7, 0xffffff, 1).beginPath().moveTo(-12, 1).lineTo(-3, 11).lineTo(14, -10).strokePath();
       parts.push(c);
     } else {
-      parts.push(txtR(this, x, y - 1, String(streak.current), 34, { color: '#ffffff', weight: 600 }).setDepth(6));
+      parts.push(txt(this, x, y - 2, String(streak.current), 32, { sw: 5, stroke: '#c24e1a', shadow: false }).setDepth(6));
     }
     parts.forEach((o) => o.setAlpha(0));
     this.tweens.add({ targets: parts, alpha: 1, delay: 1100, duration: 300 });
@@ -106,7 +106,15 @@ export default class Menu extends Phaser.Scene {
   // ---- Parent gate: a multiplication a 6 to 9 year old will not solve ----
   openGate() {
     if (this.gate || this._leaving) return;
+    this.gate = {}; // blocks a second open while the information font loads
     sfx(this, 'click');
+    // Rubik is only needed from here on, so it is fetched on demand rather than at start-up.
+    const fonts = [document.fonts.load('600 30px Rubik', 'Абв123'), document.fonts.load('400 30px Rubik', 'Абв123')];
+    Promise.race([Promise.all(fonts), new Promise((r) => setTimeout(r, 2000))]).then(() => this.buildGate());
+  }
+
+  buildGate() {
+    if (!this.scene.isActive()) return;
     const a = Phaser.Math.Between(6, 9);
     const b = Phaser.Math.Between(6, 9);
     const right = a * b;

@@ -58,7 +58,6 @@ export default class Boot extends Phaser.Scene {
     const fonts = Promise.all([
       document.fonts.load('40px Neuronus', 'Абв123'),
       document.fonts.load('900 40px Nunito', '×'),
-      document.fonts.load('600 30px Rubik', 'Абв123'),
     ]);
     const timeout = new Promise((r) => setTimeout(r, 2500));
     Promise.race([fonts, timeout]).then(() => this.scene.start('Menu'));
