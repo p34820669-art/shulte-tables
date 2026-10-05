@@ -24,23 +24,32 @@ export default class Menu extends Phaser.Scene {
       });
     }
 
-    // Layout is anchored from the bottom up (all gaps 24), so tall screens just give the hero more room.
-    const spare = H - 1280;
-    const parentsY = H - 85;                  // small text button, 40 from the bottom
-    const dailyY = parentsY - 46 - 24 - 62;   // 340 wide, 124 tall
-    const startY = dailyY - 62 - 24 - 77;     // 420 wide, 154 tall
-    const feetY = startY - 77 - 24 - 95;      // hero feet, with the cloud under them
-    const heroH = Math.min(640, 450 + spare * 0.6);
-    const logoY = 195 + spare * 0.2;
+    // Three zones from top to bottom, none overlapping: logo, hero on a cloud, then the buttons.
+    // Buttons are anchored from the bottom (gaps of 24), the logo from the top, and the hero fills
+    // whatever is left, so a taller screen only adds breathing room around the hero.
+    const rowY = H - M - 38;                    // switches row: two round icons around "Родителям"
+    const dailyY = rowY - 38 - 24 - 60;         // 330 wide, 121 tall
+    const startY = dailyY - 60 - 24 - 73;       // 400 wide, 146 tall
+    const buttonsTop = startY - 73;
+    const CLOUD = 95;                            // how far the cloud reaches below the hero's feet
+    const logoH = 500 * (285 / 640);             // logo is drawn 500 wide
+    const logoTop = 56;
+    const zoneTop = logoTop + logoH + 24;        // the hero's hair must stay below the logo
+    const avail = buttonsTop - 24 - CLOUD - zoneTop;
+    const heroH = Math.min(620, avail);
+    const extra = avail - heroH;
+    const logoY = logoTop + logoH / 2 + extra * 0.3;
+    const heroTop = zoneTop + extra * 0.55;
+    const feetY = heroTop + heroH;
 
-    // Drifting clouds (kept clear of the buttons)
-    [[feetY - 360, 0.55], [feetY - 200, 0.7], [feetY - 40, 0.5]].forEach(([y, sc]) => this.drift(y, sc));
+    // Drifting clouds, spread beside the hero
+    [[0.2, 0.5], [0.55, 0.7], [0.85, 0.45]].forEach(([k, sc]) => this.drift(heroTop + heroH * k, sc));
 
     // Hero standing on a cloud
     const cloud = this.add.image(W / 2, feetY + 10, 'cloud').setScale(0.9);
     const hero = this.add.image(W / 2, feetY, 'hero').setOrigin(0.5, 1);
     hero.setScale(heroH / hero.height);
-    this.tweens.add({ targets: hero, y: feetY - 11, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: hero, y: feetY - 10, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.tweens.add({ targets: cloud, y: feetY + 16, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     // Logo drops in with a bounce
@@ -48,11 +57,25 @@ export default class Menu extends Phaser.Scene {
     logo.setScale(500 / logo.width);
     this.tweens.add({
       targets: logo, y: logoY, duration: 900, ease: 'Bounce.Out', delay: 150,
-      onComplete: () => this.tweens.add({ targets: logo, scale: logo.scale * 1.03, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.InOut' }),
+      onComplete: () => this.tweens.add({ targets: logo, scale: logo.scale * 1.02, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.InOut' }),
     });
 
-    // Sound and clock switches sit in the top corners as round icons.
-    const snd = roundButton(this, M + 38, 70, 76, 'sound', () => {
+    const start = button(this, W / 2, startY, 'СТАРТ', {
+      w: 400, size: 62, sound: 'start', pulse: true,
+      onClick: () => go(this, 'Levels', { focus: save.currentLevel() }),
+    });
+    this.reveal(start, 700, startY);
+
+    const streak = save.streak();
+    const daily = button(this, W / 2, dailyY, 'Таблица дня', {
+      w: 330, size: 32, icon: 'flame', sound: 'start',
+      onClick: () => go(this, 'Game', { daily: true }),
+    });
+    this.reveal(daily, 850, dailyY);
+    this.dailyBadge(streak, dailyY, 330);
+
+    // Bottom row: sound switch, parents entry, clock switch.
+    const snd = roundButton(this, M + 38, rowY, 76, 'sound', () => {
       save.sound = !save.sound;
       applyMute(this);
       snd.setOff(!save.sound);
@@ -60,28 +83,13 @@ export default class Menu extends Phaser.Scene {
     }, null);
     snd.setOff(!save.sound);
     // Calm mode hides the running clock for kids who feel rushed by it.
-    const tmr = roundButton(this, W - M - 38, 70, 76, 'timer', () => {
+    const tmr = roundButton(this, W - M - 38, rowY, 76, 'timer', () => {
       save.hideTimer = !save.hideTimer;
       tmr.setOff(save.hideTimer);
     });
     tmr.setOff(save.hideTimer);
-
-    const start = button(this, W / 2, startY, 'СТАРТ', {
-      w: 420, size: 64, sound: 'start', pulse: true,
-      onClick: () => go(this, 'Levels', { focus: save.currentLevel() }),
-    });
-    this.reveal(start, 700, startY);
-
-    const streak = save.streak();
-    const daily = button(this, W / 2, dailyY, 'Таблица дня', {
-      w: 340, size: 32, icon: 'flame', sound: 'start',
-      onClick: () => go(this, 'Game', { daily: true }),
-    });
-    this.reveal(daily, 850, dailyY);
-    this.dailyBadge(streak, dailyY);
-
-    const parents = button(this, W / 2, parentsY, 'Родителям', { w: 250, size: 26, onClick: () => this.openGate() });
-    this.reveal(parents, 1000, parentsY);
+    const parents = button(this, W / 2, rowY, 'Родителям', { w: 250, size: 26, onClick: () => this.openGate() });
+    [snd, tmr, parents].forEach((o, i) => this.reveal(o, 1000 + i * 80, rowY));
   }
 
   reveal(obj, delay, y) {
@@ -90,8 +98,8 @@ export default class Menu extends Phaser.Scene {
   }
 
   // Streak badge on the daily button: number while a streak runs, a check once today is done.
-  dailyBadge(streak, dailyY) {
-    const x = W / 2 + 150;
+  dailyBadge(streak, dailyY, btnW) {
+    const x = W / 2 + btnW / 2 - 20;
     const y = dailyY - 56;
     const done = streak.doneToday;
     if (!done && streak.current === 0) return;
